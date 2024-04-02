@@ -1,0 +1,374 @@
+---
+title: "Salm Project"
+author: "Clement poupelin"
+date: "2024-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### DATA
+```{r}
+Ndoses <- 6 # i = doses
+Nplates <- 3 # j = plates
+y <-structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+21, 33, 60, 41, 42), .Dim = c(6, 3))
+t(y) # on retrouve les data
+x <-c(0, 10, 33, 100, 333, 1000)
+x
+
+data = as.data.frame(t(y))
+colnames(data)=x
+data
+
+```
+
+### INIT
+```{r}
+alpha_star <- 0
+beta <- 0
+gamma <- 0
+tau <- 0.1
+lambda <-
+structure(c(0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0,
+            0, 0, 0), .Dim = c(6, 3))
+
+init_abg = c(0, 0, 0)
+init_tau = 0.1
+```
+
+```{r}
+
+```
+
+### GIBBS with MH
+```{r}
+gibbs = function(nchain, y, x, init_abg, init_tau, sd_abg){
+  # Chaine pour alpha/beta/gamma
+  chain_abg = matrix(0, nrow = nchain + 1, ncol = 3)
+  chain_abg[1,] = init_abg
+  # Chaine pour tau
+  chain_tau = c()
+  chain_tau[1]= init_tau
+  
+  # Data
+  y = y
+  x = x
+  alpha = init_abg[1]
+  beta = init_abg[2]
+  gamma = init_abg[3]
+  mu = matrix(0, nrow = 6, ncol = 3)
+  for ( i in 1:6){
+    for (j in 1:3){
+      mu[i,j] = exp(alpha + beta*log(x[i] + 10) + gamma*x[i] + lambda[i,j])
+    }
+  }
+  
+  # Hyperparam pour tau 
+  a = 1/1000
+  b = 1/1000
+  
+  
+  acc_prob = 0
+  # MAJ des paramètres
+  for (i in 1:nchain){
+    for (j in 1:3){
+      # MAJ tau via loi posteriori explicite
+      a = a + 9
+      b = b + (sum(lambda[,j]^2))/2
+      
+      chain_tau[i+1] = rgamma(1, shape = a, rate = b)
+      
+      
+      # MAJ alpha via MH
+      alpha_candidate = rnorm(1, chain_abg[i,1], sd_abg[1] ) # perturbation gaussienne
+      
+      top = -(alpha_candidate)/(2*sd_abg[1]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      bottom = -(chain_abg[i,1])/(2*sd_abg[1]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      
+      if (runif(1) < acc_prob){
+        chain_abg[i+1,1] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[i+1,1] = chain_abg[i,1]
+    
+      # MAJ alpha via MH
+      beta_candidate = rnorm(1, chain_abg[i,2], sd_abg[2] ) # perturbation gaussienne
+      
+      top = -(beta_candidate)/(2*sd_abg[2]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      bottom = -(chain_abg[i,2])/(2*sd_abg[2]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      
+      if (runif(1) < acc_prob){
+        chain_abg[i+1,2] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[i+1,2] = chain_abg[i,2]
+  
+      # MAJ alpha via MH
+      gamma_candidate = rnorm(1, chain_abg[i,3], sd_abg[3] ) # perturbation gaussienne
+      
+      top = -(gamma_candidate)/(2*sd_abg[3]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      bottom = -(chain_abg[i,3])/(2*sd_abg[3]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      
+      if (runif(1) < acc_prob){
+        chain_abg[i+1,3] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[i+1,3] = chain_abg[i,3]
+      
+    }
+      
+  }
+    
+    
+  return(list(chain_abg = chain_abg, chain_tau=chain_tau, acc_prob = acc_prob))
+}
+
+
+```
+
+```{r}
+y
+15+21+29+16+18+21+16+26+33+27+41+60+33+38+41+20+27+42
+```
+
+```{r}
+result <- 0
+for (i in 1:nrow(y)) {
+  for (j in 1:ncol(y)) {
+    result <- result + y[i, j]
+  }
+}
+result
+```
+
+### GIBBS2 with MH
+```{r}
+gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
+  # Chaine pour alpha/beta/gamma
+  chain_abg = matrix(0, nrow = nchain + 1, ncol = 3)
+  chain_abg[1,] = init_abg
+  # Chaine pour tau
+  chain_tau = c()
+  chain_tau[1]= init_tau
+  
+  # Data
+  y = y
+  x = x
+  alpha = init_abg[1]
+  beta = init_abg[2]
+  gamma = init_abg[3]
+  mu = matrix(0, nrow = 6, ncol = 3)
+  for ( i in 1:6){
+    for (j in 1:3){
+      mu[i,j] = exp(alpha + beta*log(x[i] + 10) + gamma*x[i] + lambda[i,j])
+    }
+  }
+  
+  # Hyperparam pour tau 
+  a = 1/1000
+  b = 1/1000
+  
+  
+  acc_prob = 0
+  # MAJ des paramètres
+  for (k in 1:nchain){
+    # MAJ tau via loi posteriori explicite
+    a = a + 9
+    lambda_sum = 0
+    for (i in 1:nrow(lambda)) {
+      for (j in 1:ncol(lambda)) {
+        lambda_sum <- lambda_sum + lambda[i, j]^2
+      }
+    }
+    b = b + lambda_sum/2
+      
+    chain_tau[k+1] = rgamma(1, shape = a, rate = b)
+    lambda = mat_dnorm <- matrix(dnorm(1:18, mean = 0, sd = chain_tau[k+1]), nrow = 6, ncol = 3)
+      
+    # MAJ alpha via MH
+    alpha_candidate = rnorm(1, chain_abg[k,1], sd_abg[1] ) # perturbation gaussienne
+    
+    y_mu_sum = 0
+    mu_sum = 0
+    for (i in 1:nrow(y)) {
+      for (j in 1:ncol(y)) {
+        y_mu_sum <- y_mu_sum + y[i, j]*log(mu[i,j])
+        mu_sum = mu_sum + mu[i,j]
+      }
+    }
+    
+    top = -(alpha_candidate)/(2*sd_abg[1]^2) - mu_sum + y_mu_sum
+    bottom = -(chain_abg[k,1])/(2*sd_abg[1]^2) - mu_sum + y_mu_sum
+      
+      if (runif(1) < acc_prob){
+        chain_abg[k+1,1] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[k+1,1] = chain_abg[k,1]
+    
+      # MAJ alpha via MH
+      beta_candidate = rnorm(1, chain_abg[k,2], sd_abg[2] ) # perturbation gaussienne
+      
+      top = -(beta_candidate)/(2*sd_abg[2]^2) - mu_sum + y_mu_sum
+      bottom = -(chain_abg[k,2])/(2*sd_abg[2]^2) - mu_sum + y_mu_sum
+      
+      if (runif(1) < acc_prob){
+        chain_abg[k+1,2] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[k+1,2] = chain_abg[k,2]
+  
+      # MAJ alpha via MH
+      gamma_candidate = rnorm(1, chain_abg[k,3], sd_abg[3] ) # perturbation gaussienne
+      
+      top = -(gamma_candidate)/(2*sd_abg[3]^2) - mu_sum + y_mu_sum
+      bottom = -(chain_abg[k,3])/(2*sd_abg[3]^2) - mu_sum + y_mu_sum
+      
+      if (runif(1) < acc_prob){
+        chain_abg[k+1,3] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abg[k+1,3] = chain_abg[k,3]
+      
+      for ( i in 1:6){
+        for (j in 1:3){
+          mu[i,j] = exp(chain_abg[k+1,1] + chain_abg[k+1,2]*log(x[i] + 10) + chain_abg[k+1,3]*x[i] + lambda[i,j])
+        }
+        }
+      
+  }
+    
+    
+  return(list(chain_abg = chain_abg, chain_tau=chain_tau, acc_prob = acc_prob))
+}
+
+
+```
+
+```{r}
+res = gibbs2(5*10^4, y, x, init_abg, init_tau, c(1e-6, 1e-6, 1e-6))
+```
+
+```{r}
+library(coda)
+
+plot(res$chain_abg[,1])
+plot(res$chain_abg[,2])
+plot(res$chain_abg[,3])
+plot(res$chain_tau)
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Tentative, créer une variable plates qualitative et faire comme l'exo coagulation
+
+
+```{r}
+data2=as.data.frame(matrix(0, nrow = 18, ncol =2))
+data2[1:6,1]=t(data)[,1]
+data2[7:12,1]=t(data)[,2]
+data2[13:18,1]=t(data)[,3]
+
+data2[1:6,2]=1
+data2[7:12,2]=2
+data2[13:18,2]=3
+colnames(data2)=c("Doses", "Plates")
+data2
+```
+
+```{r}
+gibbs2 <- function(nchain = 5 * 10^4, init_abgtau, sd_abg){
+  doses <- data2$Doses
+  plates <- data2$Plates
+  diets <- unique(plates) # renvoi c(1,2,3)
+  n_group <- length(plates)
+  nobs <- length(doses)
+  
+  
+  chain_abgtau <- matrix(NA, nchain + 1, 4)
+
+  
+  colnames(chain_abgtau) <- c("alpha", "beta", "gamma", "tau")
+
+  
+  chain_abgtau[1,] <- init_abgtau
+  
+  
+  # Data
+  x = x
+  alpha = init_abgtau[1]
+  beta = init_abgtau[2]
+  gamma = init_abgtau[3]
+  mu = matrix(0, nrow = 6, ncol = 3)
+  for ( i in 1:6){
+    for (j in 1:3){
+      mu[i,j] = exp(alpha + beta*log(x[i] + 10) + gamma*x[i] + lambda[i,j])
+    }
+  }
+  
+  
+  # Hyperparam init pour tau 
+  a = 1/1000
+  b = 1/1000
+
+  
+  for (i in 1:nchain){
+    alpha <- chain_abgtau[i, "alpha"]
+    beta <- chain_abgtau[i, "beta"]
+    gamma <- chain_abgtau[i, "gamma"]
+    tau <- chain_abgtau[i, "tau"]
+    
+    ## Update tau
+    a = a + (18)/2
+    b = b + (sum(lambda^2))/2
+      
+    chain_abgtau[i+1,4] = rgamma(1, shape = a, rate = b)
+    
+    ## Update alpha
+    for (j in plates){
+      n_j <- sum(plates == j)
+      
+      alpha_candidate = rnorm(1, chain_abgtau[i,1], sd_abg[1] ) # perturbation gaussienne
+      
+      top = -(alpha_candidate)/(2*sd_abg[1]^2) - sum(mu[plates == j]) + sum(doses[plates == j]*log(mu[,j]))
+      bottom = -(chain_abgtau[i,1])/(2*sd_abg[1]^2) - sum(mu[plates == j]) + sum(doses[plates == j]*log(mu[,j]))
+      
+      if (runif(1) < acc_prob){
+        chain_abgtau[i+1,1] = prop
+        acc_prob = acc_prob + 1
+        } else chain_abgtau[i+1,1] = chain_abgtau[i,1]
+      
+      
+    }
+  }
+  
+  return(list(chain = chain_abgtau, acc_prob = acc_prob))
+  
+}
+  
+  
+```
+
+```{r}
+res = gibbs2(init_abgtau = c(0 ,0, 0, 0.1), c(1e-6, 1e-6, 1e-6))
+```
+
