@@ -1,0 +1,183 @@
+---
+title: "Salm: extra - Poisson variation in dose - response study"
+author: "Moubarak Ismail Hosky"
+date: "2024-04-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### chargement des librairies
+
+```{r}
+library(coda)
+
+```
+
+
+### Implementation de l'échantillonneure de Gibbs
+
+```{r}
+Ndoses <-
+6
+Nplates <-
+3
+y <-
+structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+21, 33, 60, 41, 42), .Dim = c(6, 3))
+x <-
+c(0, 10, 33, 100, 333, 1000)
+```
+
+
+### Définitions des trois densités conditionnelles suivantes dont on ne connait pas leurs lois explicites 
+$\alpha$,$\beta$ et $\gamma$
+
+
+pour ces trois p nous utilsons Metropolis-Hasting à l'intérieur de l'échantillonneur de Gibbs
+
+```{r}
+
+cond_density<-function(x,mu,sigma){
+  z<-exp((-1/(2*sigma))*x)*prod(exp(-mu)*(mu)^x)
+  return(z)
+}
+
+```
+
+
+```{r}
+cond_density(10,matrix(0,3,6),0.1)
+```
+
+
+```{r setup, include=FALSE}
+
+salm_gibbs <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda, nchain, prop_sd) {
+  
+  alpha_star <- 0
+  beta_star <- 0
+  gamma_star <- 0
+  tau_star <- 0.1
+  lambda_star <- matrix(0, nrow = 6, ncol = 3)  # Initialisation de lambda_star
+  
+  chain <- matrix(NA, nrow = nchain + 1, ncol = 4)
+  colnames(chain) <- c("alpha", "beta", "gamma", "tau")
+  
+  chain[1, ] <- c(alpha_star, beta_star, gamma_star, tau_star)
+  
+  mu <- matrix(0, nrow = Ndoses, ncol = Nplates)  # Initialisation de mu comme une matrice
+  
+  for (t in 1:nchain) {
+    
+    alpha <- chain[t, "alpha"]
+    beta <- chain[t, "beta"]
+    gamma <- chain[t, "gamma"]
+    tau <- chain[t, "tau"]
+    
+    # Mise à jour tau
+    
+    alpha_cond <- 0.001 + Ndoses/2
+    beta_cond <- 0.001 + sum((lambda)^2)/2
+    tau <- rgamma(1, shape = alpha_cond, rate = beta_cond)
+    
+    # Mise à jour alpha par Métropolis-Hastings à l'intérieur de Gibbs car sa loi est inconnue
+    
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        # Proposition
+        prop <- rnorm(1, mean = alpha, sd = prop_sd[j])
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop, mu[i, j], sigma = 0.1)
+        bottom <- cond_density(alpha, mu[i, j], sigma = 0.1)
+        acc_prob <- top/bottom
+        if (runif(1) < acc_prob) {
+          alpha <- prop
+        }
+        
+        chain[t + 1, "alpha"] <- alpha
+        
+      }
+    }
+    
+    # Mise à jour beta
+    
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        # Proposition
+        prop <- rnorm(1, mean = beta, sd = prop_sd[j])
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop, mu[i, j], sigma = 0.1)
+        bottom <- cond_density(beta, mu[i, j], sigma = 0.2)
+        acc_prob <- top/bottom
+        if (runif(1) < acc_prob) {
+          beta <- prop
+        }
+        
+        chain[t + 1, "beta"] <- beta
+        
+      }
+    }
+    
+    # Mise à jour gamma
+    
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        # Proposition
+        prop <- rnorm(1, mean = gamma, sd = prop_sd[j])
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop, mu[i, j], sigma = 0.1)
+        bottom <- cond_density(gamma, mu[i, j], sigma = 0.1)
+        acc_prob <- top/bottom
+        if (runif(1) < acc_prob) {
+          gamma <- prop
+        }
+        
+        chain[t + 1, "gamma"] <- gamma
+        
+      }
+    }
+  }
+  
+  return(chain)
+}
+```
+
+
+
+```{r setup,include=FALSE}
+
+alpha_init <- 0
+beta_init <- 0
+gamma_init <- 0
+tau_init <- 0.01
+lambda_init <- matrix(rep(0, Ndoses*Nplates), nrow = Ndoses, ncol = Nplates)
+
+# Nombre de chaînes
+nchain <- 10000
+
+# Pas de la proposition
+prop_sd <- c(0.1, 0.1, 0.1)
+
+# Appel de la fonction salm_gibbs pour effectuer la simulation
+simulation_chain <- salm_gibbs(Ndoses, Nplates, x, y, alpha_init, beta_init, gamma_init, tau_init, lambda_init, nchain, prop_sd)
+
+# Affichage des premières lignes de la chaîne de Markov
+head(simulation_chain)
+```
+
+
+
+```{r}
+simulation_chain
+```
+
