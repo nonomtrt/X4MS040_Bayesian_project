@@ -1,0 +1,73 @@
+---
+title: "Project: Salm"
+author: "Aëla Jagot"
+date: "15 avril 2024"
+output: 
+  prettydoc::html_pretty:
+    theme: cayman
+    highlight: github
+---
+
+Breslow (1984) analyses some mutagenicity assay data (shown below) on salmonella in which
+three plates have been processed at each dose i of quinoline and the number of revertant
+colonies of TA98 Salmonella measured. A certain dose-response curve is suggested by theory.
+The data are shown below:
+
+```{r}
+Ndoses <- 6                                          # Number of doses
+Nplates <- 3                                         # Number of plates
+y <- structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, # Number of revertant colonies measured
+                 41, 38, 27, 29, 21, 33, 60, 41, 42), .Dim = c(6, 3))
+x <- c(0, 10, 33, 100, 333, 1000)                    # Dose of quinoline (in \mu g per plate)
+```
+
+
+This is assumed to be a random effects Poisson model allowing for over-dispersion. 
+Let $x_i$ be the dose on the plates $i_1$, $i_2$ and $i_3$. Then we assume
+$$y_{ij} \sim \text{Poisson}(\mu_{ij})$$
+$$\log(\mu_{ij}) = \alpha + \beta \log(x_i + 10) + \gamma x_i +\lambda_{ij}$$
+$$\lambda_{ij} \sim \text{Normal}(0, \tau)$$
+$\alpha , \beta , \gamma , \tau$ are given independent "noninformative" priors.
+
+We carry out the calculations necessary for building the model. To remember Ndose = 6 and Nplates = 3.
+
+$\underline{For \; \alpha}:$
+
+We have a non-informative prior distribution for $\alpha$ :
+$$\alpha \sim \text{Normal}(0,\sigma_\alpha^2) \quad \text{with} \; \sigma_{alpha} \; \text{known}.$$
+We want to calculate the posterior distribution for $\alpha$:
+$$\pi(\alpha|\cdots) \propto \pi(\alpha) \prod_{i=1}^{6} \prod_{j=1}^{3} \pi(y_{ij}|\alpha,\beta,\gamma, \lambda_{ij}) \propto e^{\frac{-1}{2}\frac{\alpha^2}{\sigma_\alpha^2}} \prod_{i=1}^{6} \prod_{j=1}^{3} \mu_{ij}^{y_{ij}}e^{-\mu_{ij}}$$
+We don't recognize the distribution. It is possible to do a Metropolis-Hastings algorithm. We switch to logarithm.
+$$\log(\pi(\alpha| \cdots)) \propto \frac{\alpha^2}{\sigma_{\alpha}^2} + \sum_{i=1}^6 \sum_{j=1}^3 (y_{ij}\log(\mu_{ij})-\mu_{ij})$$
+
+$\underline{For \; \beta \; and \; \gamma}:$
+
+We obtain the same results than with $\alpha$:
+$$\log(\pi(\beta| \cdots)) \propto \frac{\beta^2}{\sigma_{\beta}^2} + \sum_{i=1}^6 \sum_{j=1}^3 (y_{ij}\log(\mu_{ij})-\mu_{ij})$$
+$$\log(\pi(\gamma| \cdots)) \propto \frac{\gamma^2}{\sigma_{\gamma}^2} + \sum_{i=1}^6 \sum_{j=1}^3 (y_{ij}\log(\mu_{ij})-\mu_{ij})$$
+
+$\underline{For \; \tau}:$
+
+We have a non-informative prior distribution for $\alpha$ :
+$$\tau\sim \text{Gamma}(\xi,\phi) \quad \text{with} \; \xi \; and \; \phi \; \text{known}.$$
+We know that $\tau = \frac{1}{\sigma^2}$.
+$$\pi(\tau|\cdots) \propto \pi(\tau) \prod_{i=1}^{6} \prod_{j=1}^{3} \pi(\lambda_{ij}|\tau) \propto \tau^{\xi-1}e^{-\phi \tau} \prod_{i=1}^{6} \prod_{j=1}^{3} \sqrt{\tau} e^{\frac{-1}{2}\tau\lambda_{ij}^2} \propto \tau^{\xi + 18 - 1} e^{-\tau(\beta + \frac{1}{2} \sum_{i=1}^{6} \sum_{j=1}^{3} \lambda_{ij}^2)}$$
+We recognize a Gamma distribution. We obtain that:
+$$\tau \sim Gamma(\xi + 18,\beta + \frac{1}{2} \sum_{i=1}^{6} \sum_{j=1}^{3} \lambda_{ij}^2)$$
+
+These are the initialization states for the model:
+
+```{r}
+alpha <- 0
+beta <- 0
+gamma <- 0
+tau <- 0.1
+lambda <-structure(c(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), 
+                   .Dim = c(6, 3))
+```
+
+We implements the model:
+```{r}
+
+```
+
