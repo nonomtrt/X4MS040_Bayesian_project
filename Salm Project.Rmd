@@ -9,6 +9,172 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+
+
+
+
+```{r}
+# rm(list=ls())
+library(coda)
+
+x = c(0, 10, 33, 100, 333, 1000)
+i1 = c(15, 16, 16, 27, 33, 20)
+i2 = c(21, 18, 26, 41, 38, 27)
+i3 = c(29, 21, 33, 69, 41, 42)
+y = structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+                 21, 33, 60, 41, 42), .Dim = c(6, 3))
+
+
+GIBBS_withinMH = function(x, y, nchain, init_abg, init_tau, sd_tau_prop,
+                  sd_abg_prop){
+  # chaine pour alpha beta gamma
+  chain_abg = matrix(NA, nchain+1, 3) 
+  chain_abg[1,] = init_abg
+  
+  # chaine pour tau
+  chain_tau = matrix(NA, nchain+1, 1) 
+  chain_tau[1] = init_tau
+  
+  # hyperparamètres
+  a = 1/1000
+  b = 1/1000
+  sigma = 100000
+  
+  # acc_prob
+  acc_prob_alpha = 0
+  acc_prob_beta = 0
+  acc_prob_gamma = 0
+  acc_prob = c(acc_prob_alpha, acc_prob_beta, acc_prob_gamma)
+  
+  for (i in 1:nchain){
+    ## Mise en place de lbda
+    lbda = rnorm(3*6, mean=0, sd=1/chain_tau[i])
+    lbda = matrix(lbda, nrow=6, ncol=3)
+    
+    ## MAJ tau via loi explicite
+    ############################
+    
+    chain_tau[i+1] = rgamma(1, a + (1/2)*3*6, b + (1/2)*sum(lbda**2))
+    
+    ## MAJ alpha beta gamma via MH
+    ##############################
+    
+    # alpha
+    alpha_candidate = rnorm(1, mean = chain_abg[i,1], sd = sd_abg_prop[1]) # perturbation gaussienne
+    mu_candidate = exp(alpha_candidate + chain_abg[i,2]*log(x + 10) + chain_abg[i,3]*x + lbda)
+    mu = exp(chain_abg[i,1] + chain_abg[i,2]*log(x + 10) +  chain_abg[i,3]*x + lbda)
+    
+    top = (alpha_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom = (chain_abg[i,1]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio = exp(top - bottom)
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,1] = alpha_candidate
+      acc_prob_alpha = acc_prob_alpha + 1
+    } else {
+      chain_abg[i+1,1] = chain_abg[i,1]
+    }
+    
+    # Beta 
+    beta_candidate = rnorm(1, mean = chain_abg[i,2], sd = sd_abg_prop[2]) # perturbation gaussienne
+    mu_candidate = exp(chain_abg[i+1,1] + beta_candidate*log(x + 10) + chain_abg[i,3]*x + lbda)
+    mu = exp(chain_abg[i+1,1] + chain_abg[i,2]*log(x + 10) + chain_abg[i,3]*x + lbda)
+    
+    top = (beta_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom = (chain_abg[i,2]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio = exp(top - bottom)
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,2] = beta_candidate
+      acc_prob_beta = acc_prob_beta + 1
+    } else {
+      chain_abg[i+1,2] = chain_abg[i,2]
+    }
+    
+    
+    # Gamma
+    gamma_candidate = rnorm(1, mean = chain_abg[i,3], sd = sd_abg_prop[3]) # perturbation gaussienne
+    mu_candidate = exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) + gamma_candidate*x + lbda)
+    mu = exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) + chain_abg[i,3]*x + lbda)
+    
+    top = (gamma_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom = (chain_abg[i,3]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio = exp(top - bottom)
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,3] = gamma_candidate
+      acc_prob_gamma = acc_prob_gamma + 1
+    } else {
+      chain_abg[i+1,3] = chain_abg[i,3]
+    }
+    
+  }
+  
+  return(list(tau = chain_tau, abg = chain_abg, acc_prob = acc_prob ))
+  
+}
+
+result = GIBBS_withinMH(x, y, 10000, c(0,0,0), 1, 0.04, c(1e-6, 1e-6, 1e-6))
+
+#result = GIBBS_withinMH(x, y, 10000, c(0,0,0), 1, 0.04, c(0.02,0.02,0.02))
+
+############################################################
+######### ERREUR QUI APPARATI SOUVENT 
+
+# Erreur dans if (runif(1) < ratio) { : 
+#   valeur manquante là où TRUE / FALSE est requis
+######################################################
+
+
+plot(mcmc(result$tau[1000:10001]))
+plot(mcmc(result$abg[1000:10001,1]))
+plot(mcmc(result$abg[1000:10001,2]))
+plot(mcmc(result$abg[1000:10001,3]))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### DATA
 ```{r}
 Ndoses <- 6 # i = doses
@@ -91,9 +257,10 @@ gibbs = function(nchain, y, x, init_abg, init_tau, sd_abg){
       
       top = -(alpha_candidate)/(2*sd_abg[1]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
       bottom = -(chain_abg[i,1])/(2*sd_abg[1]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      ratio = exp(top - bottom)
       
-      if (runif(1) < acc_prob){
-        chain_abg[i+1,1] = prop
+      if (runif(1) < ratio){
+        chain_abg[i+1,1] = alpha_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[i+1,1] = chain_abg[i,1]
     
@@ -102,9 +269,10 @@ gibbs = function(nchain, y, x, init_abg, init_tau, sd_abg){
       
       top = -(beta_candidate)/(2*sd_abg[2]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
       bottom = -(chain_abg[i,2])/(2*sd_abg[2]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      ratio = exp(top - bottom)
       
-      if (runif(1) < acc_prob){
-        chain_abg[i+1,2] = prop
+      if (runif(1) < ratio){
+        chain_abg[i+1,2] = beta_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[i+1,2] = chain_abg[i,2]
   
@@ -113,9 +281,10 @@ gibbs = function(nchain, y, x, init_abg, init_tau, sd_abg){
       
       top = -(gamma_candidate)/(2*sd_abg[3]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
       bottom = -(chain_abg[i,3])/(2*sd_abg[3]^2) - sum(mu[,j]) + sum(y[,j]*log(mu[,j]))
+      ratio = exp(top - bottom)
       
-      if (runif(1) < acc_prob){
-        chain_abg[i+1,3] = prop
+      if (runif(1) < ratio){
+        chain_abg[i+1,3] = gamma_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[i+1,3] = chain_abg[i,3]
       
@@ -131,19 +300,18 @@ gibbs = function(nchain, y, x, init_abg, init_tau, sd_abg){
 ```
 
 ```{r}
-y
-15+21+29+16+18+21+16+26+33+27+41+60+33+38+41+20+27+42
+res = gibbs(5*10^4, y, x, init_abg, init_tau, c(1e-6, 1e-6, 1e-6))
+```
+```{r}
+library(coda)
+
+plot(res$chain_abg[,1])
+plot(res$chain_abg[,2])
+plot(res$chain_abg[,3])
+plot(res$chain_tau)
+
 ```
 
-```{r}
-result <- 0
-for (i in 1:nrow(y)) {
-  for (j in 1:ncol(y)) {
-    result <- result + y[i, j]
-  }
-}
-result
-```
 
 ### GIBBS2 with MH
 ```{r}
@@ -189,6 +357,8 @@ gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
     chain_tau[k+1] = rgamma(1, shape = a, rate = b)
     lambda = mat_dnorm <- matrix(dnorm(1:18, mean = 0, sd = chain_tau[k+1]), nrow = 6, ncol = 3)
       
+    
+    
     # MAJ alpha via MH
     alpha_candidate = rnorm(1, chain_abg[k,1], sd_abg[1] ) # perturbation gaussienne
     
@@ -204,8 +374,9 @@ gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
     top = -(alpha_candidate)/(2*sd_abg[1]^2) - mu_sum + y_mu_sum
     bottom = -(chain_abg[k,1])/(2*sd_abg[1]^2) - mu_sum + y_mu_sum
       
-      if (runif(1) < acc_prob){
-        chain_abg[k+1,1] = prop
+    ratio = exp(top - bottom)  
+      if (runif(1) < ratio){
+        chain_abg[k+1,1] = alpha_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[k+1,1] = chain_abg[k,1]
     
@@ -214,9 +385,10 @@ gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
       
       top = -(beta_candidate)/(2*sd_abg[2]^2) - mu_sum + y_mu_sum
       bottom = -(chain_abg[k,2])/(2*sd_abg[2]^2) - mu_sum + y_mu_sum
+      ratio = exp(top - bottom)  
       
-      if (runif(1) < acc_prob){
-        chain_abg[k+1,2] = prop
+      if (runif(1) < ratio){
+        chain_abg[k+1,2] = beta_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[k+1,2] = chain_abg[k,2]
   
@@ -225,9 +397,10 @@ gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
       
       top = -(gamma_candidate)/(2*sd_abg[3]^2) - mu_sum + y_mu_sum
       bottom = -(chain_abg[k,3])/(2*sd_abg[3]^2) - mu_sum + y_mu_sum
+      ratio = exp(top - bottom)  
       
-      if (runif(1) < acc_prob){
-        chain_abg[k+1,3] = prop
+      if (runif(1) < ratio){
+        chain_abg[k+1,3] = gamma_candidate
         acc_prob = acc_prob + 1
         } else chain_abg[k+1,3] = chain_abg[k,3]
       
@@ -247,37 +420,18 @@ gibbs2 = function(nchain, y, x, init_abg, init_tau, sd_abg){
 ```
 
 ```{r}
-res = gibbs2(5*10^4, y, x, init_abg, init_tau, c(1e-6, 1e-6, 1e-6))
+res2 = gibbs2(5*10^4, y, x, init_abg, init_tau, c(1e-6, 1e-6, 1e-6))
 ```
 
 ```{r}
 library(coda)
 
-plot(res$chain_abg[,1])
-plot(res$chain_abg[,2])
-plot(res$chain_abg[,3])
-plot(res$chain_tau)
+plot(res2$chain_abg[,1])
+plot(res2$chain_abg[,2])
+plot(res2$chain_abg[,3])
+plot(res2$chain_tau)
 
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 Tentative, créer une variable plates qualitative et faire comme l'exo coagulation
 
@@ -296,7 +450,7 @@ data2
 ```
 
 ```{r}
-gibbs2 <- function(nchain = 5 * 10^4, init_abgtau, sd_abg){
+gibbs3 <- function(nchain = 5 * 10^4, init_abgtau, sd_abg){
   doses <- data2$Doses
   plates <- data2$Plates
   diets <- unique(plates) # renvoi c(1,2,3)
@@ -369,6 +523,270 @@ gibbs2 <- function(nchain = 5 * 10^4, init_abgtau, sd_abg){
 ```
 
 ```{r}
-res = gibbs2(init_abgtau = c(0 ,0, 0, 0.1), c(1e-6, 1e-6, 1e-6))
+res3 = gibbs3(init_abgtau = c(0 ,0, 0, 0.1), c(1e-6, 1e-6, 1e-6))
 ```
+
+```{r}
+library(coda)
+
+plot(res3$chain_abg[,1])
+plot(res3$chain_abg[,2])
+plot(res3$chain_abg[,3])
+plot(res3$chain_tau)
+
+```
+
+
+
+
+
+
+```{r}
+GIBBS <- function(x, y, nchain, init_abg, init_tau, sd_tau_prop,
+                  sd_abg_prop){
+  chain_abg <- matrix(NA, nchain+1, 3) # chaine pour alpha beta gamma
+  chain_abg[1,] <- init_abg
+  chain_tau <- matrix(NA, nchain+1, 1) # chaine pour tau
+  chain_tau[1] <- init_tau
+  
+  # hyperparamètres
+  a <- 1/1000
+  b <- 1/1000
+  sigma <- 100000
+  
+  
+  for (i in 1:nchain){
+    # MAJ tau
+    #tau_candidate <- rnorm(1,mean=chain_tau[i], sd=sd_tau_prop)
+    # Lambda nécessaire à la construction des paramètres tau et MAJ mu
+    lambda <- rnorm(3*6, mean=0, sd=1/chain_tau[i])
+    lambda <- matrix(lambda, nrow=6, ncol=3)
+    #lambda_candidate <- rnorm(3*6, mean=0, sd=1/tau_candidate)
+    #lambda_candidate <- matrix(lambda_candidate, nrow=6, ncol=3)
+    
+    #top <- log(rgamma(1, a + (1/2)*3*6, b + (1/2)*sum(lambda_candidate**2)))
+    #bottom <-log(rgamma(1, a + (1/2)*3*6, b + (1/2)*sum(lambda**2)))
+    #ratio <- top - bottom
+    #u <- log(runif(1))
+    
+   # if (u < ratio){
+    #  chain_tau[i+1] <- tau_candidate
+    #} else {
+    #  chain_tau[i+1] <- chain_tau[i]
+    #}
+    
+    chain_tau[i+1] <- rgamma(1, a + (1/2)*3*6, b + (1/2)*sum(lambda**2))
+    
+    # MAJ alpha beta gamma
+    lambda <- rnorm(3*6, mean=0, sd=1/chain_tau[i+1])
+    lambda <- matrix(lambda, nrow=6, ncol=3)
+    # alpha
+    alpha_candidate <- rnorm(1, mean = chain_abg[i,1], sd = sd_abg_prop[1])
+    mu_candidate <- exp(alpha_candidate + chain_abg[i,2]*log(x + 10) +
+                          chain_abg[i,3]*x + lambda)
+    mu <- exp(chain_abg[i,1] + chain_abg[i,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    top <- (alpha_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom <- (chain_abg[i,1]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio <- top - bottom
+    u <- log(runif(1))
+    
+    if (u < ratio){
+      chain_abg[i+1,1] <- alpha_candidate
+    } else {
+      chain_abg[i+1,1] <- chain_abg[i,1]
+    }
+    
+    # Beta 
+    beta_candidate <- rnorm(1, mean = chain_abg[i,2], sd = sd_abg_prop[2])
+    mu_candidate <- exp(chain_abg[i+1,1] + beta_candidate*log(x + 10) +
+                          chain_abg[i,3]*x + lambda)
+    mu <- exp(chain_abg[i+1,1] + chain_abg[i,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    top <- (beta_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom <- (chain_abg[i,2]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio <- top - bottom
+    u <- log(runif(1))
+    
+    if (u < ratio){
+      chain_abg[i+1,2] <- beta_candidate
+    } else {
+      chain_abg[i+1,2] <- chain_abg[i,2]
+    }
+    
+    
+    # Gamma
+    gamma_candidate <- rnorm(1, mean = chain_abg[i,3], sd = sd_abg_prop[3])
+    mu_candidate <- exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) +
+                          gamma_candidate*x + lambda)
+    mu <- exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    top <- (gamma_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(mu_candidate**y)
+    bottom <- (chain_abg[i,3]**2)/(2*sigma) + sum(mu) - sum(mu**y)
+    ratio <- top - bottom
+    u <- log(runif(1))
+    
+    if (u < ratio){
+      chain_abg[i+1,3] <- gamma_candidate
+    } else {
+      chain_abg[i+1,3] <- chain_abg[i,3]
+    }
+    
+  }
+  
+  return(list(tau = chain_tau, abg = chain_abg))
+  
+}
+```
+
+```{r}
+library(coda)
+x <- c(0, 10, 33, 100, 333, 1000)
+i1 <- c(15, 16, 16, 27, 33, 20)
+i2 <- c(21, 18, 26, 41, 38, 27)
+i3 <- c(29, 21, 33, 69, 41, 42)
+y <- structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+                 21, 33, 60, 41, 42), .Dim = c(6, 3))
+
+```
+
+```{r}
+result <- GIBBS(x, y, 10000, c(0,0,0), 1, 0.04, c(0.02,0.02,0.02))
+
+
+plot(mcmc(result$tau[1000:10001]))
+plot(mcmc(result$abg[1000:10001,1]))
+plot(mcmc(result$abg[1000:10001,2]))
+plot(mcmc(result$abg[1000:10001,3]))
+```
+
+```{r}
+# (x, y, nchain, init_abg, init_tau, sd_tau_prop, sd_abg_prop)
+res <- GIBBS(x, y, nchain=10000, init_abg=c(0,0,0), init_tau=0.1, sd_tau_prop=0.01, sd_abg_prop=c(1e-6, 1e-6, 1e-6))
+
+
+plot(mcmc(result$tau[1000:10001]))
+plot(mcmc(result$abg[1000:10001,1]))
+plot(mcmc(result$abg[1000:10001,2]))
+plot(mcmc(result$abg[1000:10001,3]))
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+
+library(coda)
+x <- c(0, 10, 33, 100, 333, 1000)
+i1 <- c(15, 16, 16, 27, 33, 20)
+i2 <- c(21, 18, 26, 41, 38, 27)
+i3 <- c(29, 21, 33, 69, 41, 42)
+y <- structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+                 21, 33, 60, 41, 42), .Dim = c(6, 3))
+
+
+GIBBS2.0 <- function(x, y, nchain, init_abg, init_tau, sd_tau_prop, sd_abg_prop){
+  chain_abg <- matrix(NA, nchain+1, 3) # chaine pour alpha beta gamma
+  chain_abg[1,] <- init_abg
+  chain_tau <- matrix(NA, nchain+1, 1) # chaine pour tau
+  chain_tau[1] <- init_tau
+  
+  # hyperparamètres
+  a <- 1/1000
+  b <- 1/1000
+  sigma <- 100000
+  
+  acc_rate = c(0,0,0) 
+  
+  for (i in 1:nchain){
+    ## MAJ tau via loi explicite
+    ############################
+    lambda <- rnorm(3*6, mean=0, sd=1/chain_tau[i]) ### verif si tau ou sqrt tau ?????????????????
+    lambda <- matrix(lambda, nrow=6, ncol=3)
+    
+    chain_tau[i+1] <- rgamma(1, a + (1/2)*3*6, b + (1/2)*sum(lambda**2))
+    
+    ## MAJ alpha beta gamma via MH
+    ##############################
+    lambda <- rnorm(3*6, mean=0, sd=1/chain_tau[i+1]) ### verif si tau ou sqrt tau ?????????????????
+    lambda <- matrix(lambda, nrow=6, ncol=3)
+    
+    ## Alpha
+    alpha_candidate <- rnorm(1, mean = chain_abg[i,1], sd = sd_abg_prop[1]) # perturbation gaussienne
+    mu_candidate <- exp(alpha_candidate + chain_abg[i,2]*log(x + 10) +
+                          chain_abg[i,3]*x + lambda)
+    mu <- exp(chain_abg[i,1] + chain_abg[i,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    
+    top <- (alpha_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(log(mu_candidate)**y)
+    bottom <- (chain_abg[i,1]**2)/(2*sigma) + sum(mu) - sum(log(mu)**y)
+    ratio <- exp(top - bottom) 
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,1] <- alpha_candidate
+      acc_rate[1] = acc_rate[1] + 1
+    } else {
+      chain_abg[i+1,1] <- chain_abg[i,1]
+    }
+    
+    ## Beta 
+    beta_candidate <- rnorm(1, mean = chain_abg[i,2], sd = sd_abg_prop[2])
+    mu_candidate <- exp(chain_abg[i+1,1] + beta_candidate*log(x + 10) +
+                          chain_abg[i,3]*x + lambda)
+    mu <- exp(chain_abg[i+1,1] + chain_abg[i,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    top <- (beta_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(log(mu_candidate)**y)
+    bottom <- (chain_abg[i,2]**2)/(2*sigma) + sum(mu) - sum(log(mu)**y)
+    ratio <- exp(top - bottom) 
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,2] <- beta_candidate
+      acc_rate[2] = acc_rate[2] + 1
+    } else {
+      chain_abg[i+1,2] <- chain_abg[i,2]
+    }
+    
+    
+    ## Gamma
+    gamma_candidate <- rnorm(1, mean = chain_abg[i,3], sd = sd_abg_prop[3])
+    mu_candidate <- exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) +
+                          gamma_candidate*x + lambda)
+    mu <- exp(chain_abg[i+1,1] + chain_abg[i+1,2]*log(x + 10) +
+                chain_abg[i,3]*x + lambda)
+    top <- (gamma_candidate**2)/(2*sigma) + sum(mu_candidate) - sum(log(mu_candidate)**y)
+    bottom <- (chain_abg[i,3]**2)/(2*sigma) + sum(mu) - sum(log(mu)**y)
+    ratio <- exp(top - bottom) 
+    
+    if (runif(1) < ratio){
+      chain_abg[i+1,3] <- gamma_candidate
+      acc_rate[3] = acc_rate[3] + 1
+    } else {
+      chain_abg[i+1,3] <- chain_abg[i,3]
+    }
+    
+  }
+  
+  return(list(tau = chain_tau, abg = chain_abg, acc_rate = acc_rate))
+  
+}
+
+# (x, y, nchain, init_abg, init_tau, sd_tau_prop, sd_abg_prop)
+res2.0 <- GIBBS2.0(x, y, nchain=10000, init_abg=c(0,0,0), init_tau=0.1, sd_tau_prop=0.01, sd_abg_prop=c(1e-6, 1e-6, 1e-6))
+
+
+plot(mcmc(result$tau[1000:10001]))
+plot(mcmc(result$abg[1000:10001,1]))
+plot(mcmc(result$abg[1000:10001,2]))
+plot(mcmc(result$abg[1000:10001,3]))
+```
+
 
