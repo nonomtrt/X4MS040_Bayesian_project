@@ -102,8 +102,8 @@ model <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda,
         mu.candidate[j, i] <- exp(alpha.candidate + chain[k, 2] * log(x[j] + 10) + chain[k, 3] * x[j] + lambda[j, i])
       }
     }
-    alpha.top <- alpha.candidate^2 / (2*alpha.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
-    alpha.bottom <- chain[k, 1]^2 / (2*alpha.sigma2) + sum(y * log(mu) - mu)
+    alpha.top <- alpha.candidate^2 / (-2*alpha.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
+    alpha.bottom <- chain[k, 1]^2 / (-2*alpha.sigma2) + sum(y * log(mu) - mu)
     alpha.ratio <- alpha.top - alpha.bottom
     if(!is.na(alpha.ratio) && log(runif(1)) < alpha.ratio){
       chain[k + 1, 1] <- alpha.candidate
@@ -118,8 +118,8 @@ model <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda,
         mu.candidate[j, i] <- exp(chain[k+1,1] + beta.candidate * log(x[j] + 10) + chain[k, 3] * x[j] + lambda[j, i])
       }
     }
-    beta.top <- beta.candidate^2 / (2*beta.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
-    beta.bottom <- chain[k, 2]^2 / (2*beta.sigma2) + sum(y * log(mu) - mu)
+    beta.top <- beta.candidate^2 / (-2*beta.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
+    beta.bottom <- chain[k, 2]^2 / (-2*beta.sigma2) + sum(y * log(mu) - mu)
     beta.ratio <- beta.top - beta.bottom
     if(!is.na(beta.ratio) && log(runif(1)) < beta.ratio){
       chain[k + 1, 2] <- beta.candidate
@@ -134,8 +134,8 @@ model <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda,
         mu.candidate[j, i] <- exp(chain[k+1, 1] + chain[k+1, 2] * log(x[j] + 10) + gamma.candidate * x[j] + lambda[j, i])
       }
     }
-    gamma.top <- gamma.candidate^2 / (2*gamma.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
-    gamma.bottom <- chain[k, 3]^2 / (2*gamma.sigma2) + sum(y * log(mu) - mu)
+    gamma.top <- gamma.candidate^2 / (-2*gamma.sigma2) + sum(y * log(mu.candidate) - mu.candidate)
+    gamma.bottom <- chain[k, 3]^2 / (-2*gamma.sigma2) + sum(y * log(mu) - mu)
     gamma.ratio <- gamma.top - gamma.bottom
     if(!is.na(gamma.ratio) && log(runif(1)) < gamma.ratio){
       chain[k + 1, 3] <- gamma.candidate
