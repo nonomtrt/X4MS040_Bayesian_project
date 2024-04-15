@@ -91,11 +91,11 @@ model <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda,
   
   ## Update
   for(k in 1:nchain){
-    tau.rate <- tau.xi + .5*Ndoses*Nplates
-    tau.shape <- 1/(tau.phi) + (.5*sum(lambda**2))
+    tau.shape <- tau.xi + .5*Ndoses*Nplates
+    tau.rate <- 1/(tau.phi) + (.5*sum(lambda**2))
     tau <- rgamma(n = 1, rate = tau.rate, shape = tau.shape)
     chain[k + 1, 4] <- tau
-    lambda <- structure(rnorm(n = Nplates * Ndoses, mean = 0, sd = 1/sqrt((chain[k + 1, 4]))), .Dim = c(Ndoses, Nplates))
+    lambda <- structure(rnorm(n = Nplates * Ndoses, mean = 0, sd = sqrt((chain[k + 1, 4]))), .Dim = c(Ndoses, Nplates))
     
     # Metropolis-Hastings for alpha
     alpha.candidate <- rnorm(1, mean = chain[k, 1], sd = prop_sd[1])
