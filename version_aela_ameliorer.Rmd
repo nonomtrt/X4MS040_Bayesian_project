@@ -72,9 +72,9 @@ We implement the model (NOT FINISHED):
 model <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda, 
                   nchain, prop_sd){
   ## Hyperparameters
-  alpha.sigma2 <- sqrt(1/.000001)
-  beta.sigma2 <- sqrt(1/.000001)
-  gamma.sigma2 <- sqrt(1/.000001)
+  alpha.sigma2 <- 1/.000001
+  beta.sigma2 <- 1/.000001
+  gamma.sigma2 <- 1/.000001
   tau.xi <- .001
   tau.phi <- .001
   ## Initialization
