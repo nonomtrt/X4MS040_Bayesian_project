@@ -1,0 +1,176 @@
+---
+title: "Salm: extra - Poisson variation in dose - response study"
+author: "Moubarak Ismail Hosky"
+date: "2024-04-04"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+### chargement des librairies
+
+```{r}
+library(coda)
+
+```
+
+
+### Implementation de l'échantillonneure de Gibbs
+
+```{r}
+Ndoses <-
+6
+Nplates <-
+3
+y <-
+structure(c(15, 16, 16, 27, 33, 20, 21, 18, 26, 41, 38, 27, 29, 
+21, 33, 60, 41, 42), .Dim = c(6, 3))
+x <-
+c(0, 10, 33, 100, 333, 1000)
+```
+
+
+### Définitions des trois densités conditionnelles suivantes dont on ne connait pas leurs lois explicites 
+$\alpha$,$\beta$ et $\gamma$
+
+
+pour ces trois p nous utilsons Metropolis-Hasting à l'intérieur de l'échantillonneur de Gibbs
+
+```{r}
+
+cond_density<-function(x,mu,sigma,y){
+  for (i in 1:6) {
+    
+    for (j in 1:3) {
+      z<-exp((-1/(2*sigma^2)-sum(mu[i,j]))*x^2)*prod(mu[i,j]^y[i,j])
+      
+    }
+    
+  }
+  
+  
+  
+  return(z)
+}
+cond_density(-0.5,matrix(1,6,3),2000,y)
+
+```
+
+
+```{r}
+cond_density(1,matrix(1,6,3),20000,y)
+```
+
+
+```{r setup, include=FALSE}
+
+salm_gibbs <- function(Ndoses, Nplates, x, y, alpha, beta, gamma, tau, lambda, nchain, prop_sd) {
+  
+  # Initialisation de mu comme une matrice
+  mu <- matrix(1, nrow = Ndoses, ncol = Nplates) 
+  
+  # Initialisation de sigma
+  sigma <- 2000000
+  
+  # Boucle principale Gibbs
+  for (t in 1:nchain) {
+    
+    # Mise à jour alpha par Métropolis-Hastings à l'intérieur de Gibbs
+    # Proposition
+        prop_alpha <- rnorm(1, mean = alpha, sd = prop_sd[1])
+        
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(prop_alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop_alpha, mu, sigma = sigma, y)
+        bottom <- cond_density(alpha, mu, sigma = sigma, y)
+        acc_prob <- top /bottom
+        
+        if (!is.na(acc_prob) && log(runif(1)) < acc_prob) {
+          alpha <- prop_alpha
+        }
+        
+        chain[t + 1, "alpha"] <- alpha
+      }
+    }
+    #mu <- matrix(1, nrow = Ndoses, ncol = Nplates) 
+    # Mise à jour beta
+        # Proposition
+        prop_beta <- rnorm(1, mean = beta, sd = prop_sd[2])
+        
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop_beta, mu, sigma = sigma, y)
+        bottom <- cond_density(beta, mu, sigma = sigma, y)
+        acc_prob <- top / bottom
+        
+        if (!is.na(acc_prob) && log(runif(1)) < acc_prob) {
+          beta <- prop_beta
+        }
+        
+        chain[t + 1, "beta"] <- beta
+      }
+    }
+    #mu <- matrix(1, nrow = Ndoses, ncol = Nplates) 
+    # Mise à jour gamma
+    for (i in 1:Ndoses) {
+      for (j in 1:Nplates) {
+        mu[i, j] <- exp(alpha + beta * log(x[i] + 10) + gamma * x[i] + lambda[i, j])
+        
+        # Proposition
+        prop_gamma <- rnorm(1, mean = gamma, sd = prop_sd[j])
+        
+        # Calcul de la probabilité d'acceptation
+        top <- cond_density(prop_gamma, mu[i, j], sigma = sigma, y)
+        bottom <- cond_density(gamma, mu, sigma = sigma, y)
+        acc_prob <- top / bottom
+        
+        if (!is.na(acc_prob) && log(runif(1)) < acc_prob) {
+          gamma <- prop_gamma
+        }
+        
+        chain[t + 1, "gamma"] <- gamma
+      }
+    }
+  }
+  
+  return(chain)
+}
+```
+
+
+
+```{r setup,include=FALSE}
+
+alpha_init <- 0
+beta_init <- 0
+gamma_init <- 0
+tau_init <- 0.01
+lambda_init <- matrix(rep(0, Ndoses*Nplates), nrow = Ndoses, ncol = Nplates)
+
+# Nombre de chaînes
+nchain <- 10000
+
+# Pas de la proposition
+prop_sd <- c(1, 1, 1)
+
+# Appel de la fonction salm_gibbs pour effectuer la simulation
+simulation_chain <- salm_gibbs(Ndoses, Nplates, x, y, alpha_init, beta_init, gamma_init, tau_init, lambda_init, nchain, prop_sd)
+
+# Affichage des premières lignes de la chaîne de Markov
+head(simulation_chain)
+```
+
+
+
+```{r}
+simulation_chain
+```
+
